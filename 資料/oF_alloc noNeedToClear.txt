@@ -1,0 +1,69 @@
+/************************************************************
+以下のようにすべきか？
+	if(texture.isAllocated()) texture.clear();
+************************************************************/
+/*------------------------------
+結論
+------------------------------*/
+不要
+
+∵
+既存リソースがあれば内部で解放処理を行う設計になっている
+
+
+/*------------------------------
+source
+------------------------------*/
+openFrameworks本体の
+	libs/openFrameworks/gl/
+		ofTexture.h
+		ofTexture.cpp
+			void ofTexture::allocate(...)
+
+上記関数に
+	clear()
+が入っていた
+
+
+/*------------------------------
+clear()
+------------------------------*/
+void ofTexture::clear(){
+	if(!texData.bUseExternalTextureID){
+		release(texData.textureID);
+	}
+	texData.bUseExternalTextureID = false;
+	texData.textureID  = 0;
+	texData.bAllocated = false;
+}
+
+■ 解説
+		release(texData.textureID);
+	であって、
+		glDeleteTextures(...)
+	ではない。
+	
+	↑同じ OpenGL Texture ID を複数の ofTexture が参照している場合の対応
+		ofTexture texA;
+		ofTexture texB = texA;
+	
+	つまり
+		allocate()
+			↓
+		retain(+1)
+		
+		clear()
+			↓
+		release(-1)
+		
+		参照数 0
+			↓
+		glDeleteTextures()
+
+
+/*------------------------------
+今回確認できた事実を一言でまとめると、
+------------------------------*/
+oFの allocate() は「新規確保」ではなく、「再確保(reallocate)も含めて面倒を見るAPI」
+
+

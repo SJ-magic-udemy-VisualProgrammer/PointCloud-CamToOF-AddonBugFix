@@ -1,0 +1,239 @@
+/************************************************************
+************************************************************/
+
+/*------------------------------
+bug Fix : source code
+------------------------------*/
+const std::string ofxNDIdynloader::FindRuntime() {
+
+	std::string rt;
+	
+	
+	// -- after : ここから
+	rt = GetCurrentExePath();
+	std::cout << "EXE PATH = " << rt << std::endl;
+	
+	if (!rt.empty()) {
+		// 実行ファイル名を削除してフォルダにする
+		size_t pos = rt.find_last_of("/\\");
+		if (pos != std::string::npos)
+			rt = rt.substr(0, pos);
+		
+		rt += "/";
+		rt += NDILIB_LIBRARY_NAME;
+		
+		std::cout << "CHECKING = " << rt << std::endl;
+	
+		if (access(rt.c_str(), F_OK) == 0) {
+			std::cout << "FOUND LOCAL NDI LIB" << std::endl;
+			return rt;
+		}
+	}
+	// -- after : ここまで
+	
+	// -- before : ここから
+	/*
+	// First look in the executable folder for the dll
+	// in case it is distributed with the application.
+	rt = GetCurrentExePath();
+	if (!rt.empty()) {
+		rt += "/";
+		rt += NDILIB_LIBRARY_NAME;
+		if (access(rt.c_str(), F_OK) == 0) {
+			return rt;
+		}
+	}
+	*/
+	// -- before : ここまで
+	
+	
+	// Use a fixed path instead of getenv(NDILIB_REDIST_FOLDER)
+	// due to missing environment variable after runtime installation.
+	// If the runtime folder is not found, return the library file name.
+#if defined(TARGET_LINUX)
+	const char * p_NDI_runtime_folder = "/usr/local/lib/libndi.so"; // Linux uses .so
+#elif defined(TARGET_OSX)
+	const char * p_NDI_runtime_folder = "/usr/local/lib/libndi.dylib"; // macOS uses .dylib
+#else
+	const char * p_NDI_runtime_folder = nullptr;
+#endif
+	if (p_NDI_runtime_folder)
+		rt = p_NDI_runtime_folder;
+	else
+		rt = NDILIB_LIBRARY_NAME;
+
+	return rt;
+}
+
+
+/*------------------------------
+bug 概要
+------------------------------*/
+
+	rt = GetCurrentExePath();
+によって、
+	EXE PATH = /Users/nobuhiro/Documents/source/openframeworks/of_v0.12.1_osx_release/apps/myApps/ud__study_ndi/bin/ud__study_ndi.app/Contents/MacOS/ud__study_ndi
+となる。
+
+すると、
+	rt += "/";
+	rt += NDILIB_LIBRARY_NAME;
+によって
+	.../MacOS/ud__study_ndi/libndi.dylib
+本来は、
+	.../MacOS/libndi.dylib
+を狙っているので、これは間違い！！
+
+
+
+/*------------------------------
+size_t pos = rt.find_last_of("/\\");
+if (pos != std::string::npos)
+	rt = rt.substr(0, pos);
+------------------------------*/
+■ やってること
+	「パスの最後のファイル名を削って、フォルダ名だけにする」
+
+■ 解説
+	まず GetCurrentExePath() が返した値は、
+		/Users/nobuhiro/.../MacOS/ud__study_ndi
+	でした。
+	
+	size_t pos = rt.find_last_of("/\\");
+		「文字列の最後に出てくる / または \ の位置を探して」
+	
+	例えば、
+		/Users/nobuhiro/test/app
+		0     6        15   20
+	
+	だと、posには、「20」みたいな値が入る。
+	
+	そして、
+		find_last_of("/\\")
+	は、
+		/ または \ を探す。
+	
+	何故なら
+		Mac/Linux
+			/Users/nobuhiro/test
+		Windows
+			C:\Users\nobuhiro\test
+	-> 両対応するため
+	
+	
+	˝\˝ が ˝\\˝ になっているのは、エスケープシーケンス。
+	
+	
+	次、
+		if (pos != std::string::npos)
+	これは「ちゃんと見つかった？」という確認です。
+	
+	例えば、
+		std::string s = "hello";
+	に対して
+		s.find_last_of("/")
+	すると、見つからない
+	
+	そのとき返ってくる特殊な値が
+		std::string::npos
+	
+	イメージとしては
+		-1
+	みたいなものです（実際は違いますが感覚的にはそれでOK）
+	
+	最後に
+		rt = rt.substr(0, pos);
+	0文字目から pos の直前まで取り出す(実際には、"pos文字分" 取り出す)
+
+
+/*------------------------------
+C++ : ↑をfilesystemを使って新しいcodeで書くと
+------------------------------*/
+■ filesystemとは？
+	C++17で追加された、
+	ファイルやフォルダを扱うための標準ライブラリ
+
+
+■ 使い方
+		#include <filesystem>
+		namespace fs = std::filesystem;
+	
+	としておいて、
+		
+		std::string rt = "/Users/nobuhiro/test/app";
+		fs::path p(rt); // path object 生成 : 文字列 -> filesystem専用オブジェクト
+		
+		auto parent = p.parent_path(); // /Users/nobuhiro/test/app -> /Users/nobuhiro/test
+		
+		rt = parent.string(); // 型を戻す : fs::path -> string
+
+
+■ before/ after
+	before
+		size_t pos = rt.find_last_of("/\\");
+		if(pos != std::string::npos)
+		{
+			rt = rt.substr(0, pos);
+		}
+	
+	after
+		#include <filesystem>
+		
+		std::filesystem::path p(rt);
+		rt = p.parent_path().string();
+
+
+■ filename()も便利
+	例えば
+	
+	fs::path p("/Users/nobuhiro/test/app");
+	p.filename(); // -> app
+
+
+■ extension(), stem()
+	fs::path p("/Users/nobuhiro/test/image.jpg");
+	p.extension();	// -> .jpg
+	p.stem();		// -> image
+
+
+■ path結合
+	old
+		rt += "/";
+		rt += "libndi.dylib";
+	
+	new
+		fs::path p(rt);
+		p /= "libndi.dylib";
+	
+	つまり
+	fs::path p("/Users/nobuhiro/test");
+	p /= "libndi.dylib"; // 結果 : /Users/nobuhiro/test/libndi.dylib
+
+
+■ 最終code : filesystem ver
+	#include <filesystem>
+	
+	namespace fs = std::filesystem;
+	
+	std::string rt = GetCurrentExePath();
+	
+	if(!rt.empty())
+	{
+		fs::path p(rt);
+	
+		p = p.parent_path();
+		p /= NDILIB_LIBRARY_NAME;
+	
+		std::cout << "CHECKING = "
+				<< p.string()
+				<< std::endl;
+	
+		if(access(p.string().c_str(), F_OK) == 0)
+		{
+			return p.string();
+		}
+	}
+
+
+
+
