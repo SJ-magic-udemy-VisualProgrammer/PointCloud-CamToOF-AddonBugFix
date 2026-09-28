@@ -1,20 +1,26 @@
 /************************************************************
+資料/
 ************************************************************/
-■ ofxNDI-original
-	動画作成時点でのofxNDI original
-	
-■ ofxNDI-SjFixed/
-	本Lectureで使用した、修正済みaddon 一式
-	
-	修正ファイルは以下
-		src/ofxNDIdynloader.cpp
-		src/ofxNDIreceive.cpp
-		src/ofxNDIreceive.h
-		src/ofxNDIreceiver.cpp
-		src/ofxNDIreceiver.h
+■ bugFix_FindRuntime.txt
 
-■ 資料/
-	- bugFix_FindRuntime.txt
-	- oF_alloc noNeedToClear.txt
-	- Original addonSource Note.pdf
+■ oF_alloc noNeedToClear.txt
+
+■ Original addonSource Note.pdf
+
+
+/************************************************************
+SourceCode/
+************************************************************/
+
+
+/************************************************************
+link
+************************************************************/
+■ GitHub
+	https://github.com/SJ-magic-udemy-VisualProgrammer/PointCloud-CamToOF-prepare_of_xNDI
+		以下のSourceCodeは、↑からdownloadしてください。
+			- ofxNDI-original.zip
+			- ofxNDI-SjFixed.zip
+
+
 
